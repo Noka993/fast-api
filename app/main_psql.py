@@ -13,13 +13,15 @@ class Post(BaseModel):
     content: str
     published: bool = True  # Default value
     rating: Optional[int] = None
+
+
 while True:
     try:
         conn = psycopg.connect(
             """host=localhost port=5432 
             dbname=fastapi user=postgres password=admin123""",
-            row_factory=psycopg.rows.dict_row
-                               )
+            row_factory=psycopg.rows.dict_row,
+        )
         cursor = conn.cursor()
         print("Database connection was successful!")
         break
@@ -30,15 +32,18 @@ while True:
 
 my_posts = [{"title": "title of post 1", "content": "content of post 1", "id": 1}]
 
+
 def find_post(id):
     for p in my_posts:
         if p["id"] == id:
             return p
 
+
 def find_index_post(id):
     for i, p in enumerate(my_posts):
         if p["id"] == id:
             return i
+
 
 @app.get("/")
 def root():
@@ -61,8 +66,8 @@ def create_posts(new_post: Post):
     cursor.execute(
         """
         INSERT INTO posts (title, content, published) 
-        VALUES (%s, %s, %s) RETURNING *""", 
-        (new_post.title, new_post.content, new_post.published)
+        VALUES (%s, %s, %s) RETURNING *""",
+        (new_post.title, new_post.content, new_post.published),
     )
     conn.commit()
     return {"data": "created post"}
@@ -73,7 +78,8 @@ def get_post(id: int):
     cursor.execute(
         """
         SELECT * FROM posts WHERE id = %s
-        """, (str(id),)
+        """,
+        (str(id),),
     )
     post = cursor.fetchone()
     # print(test_post)
@@ -87,12 +93,14 @@ def get_post(id: int):
     #   return {"message": f"post with id: {id} was not found"}
     return {"data": post}
 
+
 @app.delete("/posts/{id}")
 def delete_post(id: int, status_code=status.HTTP_204_NO_CONTENT):
     cursor.execute(
         """
         DELETE FROM posts WHERE id = %s RETURNING id
-        """, (str(id),)
+        """,
+        (str(id),),
     )
     deleted_post = cursor.fetchone()
     conn.commit()
@@ -102,17 +110,18 @@ def delete_post(id: int, status_code=status.HTTP_204_NO_CONTENT):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"post with id: {id} was not found",
         )
-    
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
 @app.put("/posts/{id}")
 def update_post(id: int, post: Post):
-
     cursor.execute(
         """
         UPDATE posts SET title = %s, content = %s, published = %s
         WHERE id = %s RETURNING *
-        """, (post.title, post.content, post.published, str(id))
+        """,
+        (post.title, post.content, post.published, str(id)),
     )
     updated_post = cursor.fetchone()
     conn.commit()
