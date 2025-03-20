@@ -10,14 +10,11 @@ router = APIRouter(
 )
 
 
-@router.get("/")
-def root():
-    return {"message": "Hello wwdadod!"}
-
-
 @router.get("/", response_model=List[schemas.Post])
-def get_posts(db: Session = Depends(get_db)):
-    posts = db.query(models.Post).all()
+def get_posts(
+    db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(oauth2.get_current_user)
+):
+    posts = db.query(models.Post).filter(models.Post.owner_id == current_user.id).all()
     return posts
 
 
@@ -25,13 +22,13 @@ def get_posts(db: Session = Depends(get_db)):
 def create_posts(
     post: schemas.PostCreate,
     db: Session = Depends(get_db),
-    get_current_user: int = Depends(oauth2.get_current_user),
+    current_user: schemas.UserOut = Depends(oauth2.get_current_user),
 ):
     # new_post = models.Post(
     #     title=post.title, content=post.content, published=post.published
     #     )
 
-    new_post = models.Post(**post.model_dump())
+    new_post = models.Post(owner_id=current_user.id, **post.model_dump())
 
     db.add(new_post)
     db.commit()
@@ -41,7 +38,11 @@ def create_posts(
 
 
 @router.get("/{id}", response_model=schemas.Post)
-def get_post(id: int, db: Session = Depends(get_db)):
+def get_post(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserOut = Depends(oauth2.get_current_user),
+):
     post = db.query(models.Post).filter(models.Post.id == id).first()
 
     if not post:
@@ -53,19 +54,31 @@ def get_post(id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{id}")
-def delete_post(id: int, db: Session = Depends(get_db)):
+def delete_post(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserOut = Depends(oauth2.get_current_user),
+):
     # cursor.execute(
     #     """
     #     DELETE FROM posts WHERE id = %s RETURNING id
     #     """,
     #     (str(id),),
     # )
-    post = db.query(models.Post).filter(models.Post.id == id)
+    post_query = db.query(models.Post).filter(models.Post.id == id)
 
-    if post.first() is None:
+    post = post_query.first()
+
+    if post is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"post with id: {id} was not found",
+        )
+
+    if post.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to perform requested action",
         )
 
     post.delete(synchronize_session=False)
@@ -76,7 +89,10 @@ def delete_post(id: int, db: Session = Depends(get_db)):
 
 @router.put("/{id}", response_model=schemas.Post)
 def update_post(
-    id: int, updated_post: schemas.PostCreate, db: Session = Depends(get_db)
+    id: int,
+    updated_post: schemas.PostCreate,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserOut = Depends(oauth2.get_current_user),
 ):
     post_query = db.query(models.Post).filter(models.Post.id == id)
     post = post_query.first()
