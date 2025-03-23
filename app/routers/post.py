@@ -2,7 +2,7 @@ from fastapi import status, HTTPException, Response, Depends, APIRouter
 from .. import models, schemas, oauth2
 from sqlalchemy.orm import Session
 from ..database import get_db
-from typing import List
+from typing import List, Optional
 
 router = APIRouter(
     prefix="/posts",
@@ -12,9 +12,29 @@ router = APIRouter(
 
 @router.get("/", response_model=List[schemas.Post])
 def get_posts(
-    db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(oauth2.get_current_user)
+    db: Session = Depends(get_db),
+    current_user: schemas.UserOut = Depends(oauth2.get_current_user),
+    limit: int = 10,
+    skip: int = 0,
+    search: Optional[str] = "",
 ):
-    posts = db.query(models.Post).filter(models.Post.owner_id == current_user.id).all()
+    # get posts owned by the user
+    # posts = (
+    #     db.query(models.Post)
+    #     .filter(models.Post.owner_id == current_user.id)
+    #     .limit(limit)
+    #     .offset(skip)
+    #     .all()
+    # )
+
+    posts = (
+        db.query(models.Post)
+        .filter(models.Post.title.contains(search))
+        .limit(limit)
+        .offset(skip)
+        .all()
+    )
+
     return posts
 
 
@@ -50,6 +70,13 @@ def get_post(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"post with id: {id} was not found",
         )
+
+    if post.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to perform requested action",
+        )
+
     return post
 
 
