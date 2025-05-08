@@ -1,15 +1,8 @@
-from pydantic import BaseModel, EmailStr, conint
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional
 
-
-class UserOut(BaseModel):
-    id: int
-    email: EmailStr
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+from pydantic.types import conint
 
 
 class PostBase(BaseModel):
@@ -22,15 +15,23 @@ class PostCreate(PostBase):
     pass
 
 
+class UserOut(BaseModel):
+    id: int
+    email: EmailStr
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
 class Post(PostBase):
-    # Post for response
     id: int
     created_at: datetime
     owner_id: int
     owner: UserOut
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class PostOut(BaseModel):
@@ -38,7 +39,7 @@ class PostOut(BaseModel):
     votes: int
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class UserCreate(BaseModel):
